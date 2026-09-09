@@ -1,0 +1,157 @@
+ABOUT ME
+
+Name: Karthik S
+Location: Pathanamthitta, Kerala, India
+
+PROFESSIONAL SUMMARY
+
+Karthik S is a Data Science graduate and Junior Developer with hands-on experience in Python, SQL, machine learning, data analysis, ETL pipelines, Generative AI, and web application development. He has experience building data-driven solutions, developing and validating production features, working with enterprise financial and ESG data, and translating business requirements into technical solutions.
+
+He has experience with Enterprise Performance Management (EPM), financial data integration, enterprise reporting, and business transformation using CCH Tagetik. He is also interested in building scalable analytics and AI solutions.
+
+CURRENT ROLE
+
+Company: SAM Corporate
+Role: Trainee Business Consultant / Junior Developer
+Location: Kochi, Kerala
+Period: February 2026 – Present
+
+At SAM Corporate, Karthik works across business, data, and software development. His work includes:
+
+- Building and maintaining ETL pipelines in CCH Tagetik (EPM) for integrating financial and ESG datasets.
+- Using SQL for extraction, transformation, and validation of large-scale financial data.
+- Designing and maintaining data models for financial reporting, ESG reporting, and Corporate Performance Management (CPM).
+- Developing internal tools using React, Next.js, TypeScript, and PostgreSQL.
+- Owning assigned features from requirements analysis through development, testing, and delivery.
+- Collaborating with cross-functional teams and stakeholders.
+- Participating in Agile sprints, stand-ups, reviews, demos, and technical discussions.
+
+TECHNICAL SKILLS
+
+Programming:
+- Python
+- SQL
+- R
+- TypeScript
+
+Machine Learning and AI:
+- Scikit-learn
+- XGBoost
+- TensorFlow
+- PyTorch
+- CNN
+- RNN
+- Random Forest
+- Feature Engineering
+- Model Evaluation
+- Predictive Modeling
+
+Generative AI:
+- RAG
+- Large Language Models (LLMs)
+- DeepSeek API
+
+Data Science and Analysis:
+- Pandas
+- NumPy
+- Exploratory Data Analysis (EDA)
+- Statistical Analysis
+- Statistical Modeling
+- Hypothesis Testing
+- Predictive Modeling
+
+Data Engineering:
+- ETL Pipelines
+- PySpark
+- Data Modeling
+- PostgreSQL
+
+Visualization:
+- Power BI
+- Matplotlib
+
+Web and Application Development:
+- React
+- Next.js
+- Flask
+- REST APIs
+- Firebase
+- PostgreSQL
+
+Enterprise Technologies:
+- CCH Tagetik (EPM)
+- Collaborative Disclosure Management (CDM)
+- Financial Reporting
+- ESG Reporting
+- Corporate Performance Management (CPM)
+
+Tools:
+- Git
+- Jupyter
+
+INTERNSHIP EXPERIENCE
+
+ICT Academy of Kerala — Project Intern, AI/RAG
+May 2025 – July 2025
+
+Karthik developed a RAG-based chatbot using the DeepSeek API. The project involved document indexing and retrieval to generate domain-specific responses. He managed the project lifecycle from requirements gathering and solution design through implementation, testing, and deployment.
+
+ICT Academy of Kerala — Machine Learning and AI Intern
+October 2024 – November 2024
+
+Karthik built Scikit-learn classification pipelines using feature selection and hypothesis testing and achieved an F1-score of 0.88. He also developed a CNN image classification model using TensorFlow and prepared a detailed technical report.
+
+Academor — Data Science Intern
+April 2023 – May 2023
+
+Karthik performed exploratory data analysis and statistical hypothesis testing on a large dataset. He generated three data-backed business recommendations and presented them directly to the client.
+
+PROJECTS
+
+AirScapes
+Technologies: Python, XGBoost, Flask, REST APIs
+Website: airscapes.me
+Year: 2024
+
+AirScapes is a real-time air quality prediction system built using XGBoost and Flask. Karthik improved prediction accuracy by 12% and reduced inference latency by 35% through feature engineering and hyperparameter tuning.
+
+LevelUp
+Technologies: Next.js, Firebase, AI Recommendations
+Year: 2026
+
+LevelUp is an AI-powered gamified Learning Management System (LMS). It includes personalized learning paths, XP tracking, and leaderboards. Karthik led a cross-functional team of four during the design and implementation of the project.
+
+EDUCATION
+
+SCMS School of Engineering and Technology
+B.Tech in Computer Science and Engineering with Data Science
+October 2022 – April 2026
+CGPA: 7.78
+University: APJ Abdul Kalam Technological University
+
+Amrita Vidyalayam
+Secondary and Senior Secondary Education
+June 2009 – June 2022
+Board: CBSE
+
+CERTIFICATIONS
+
+- Data Analysis with Python — Infosys, 2025
+- Python for Data Science — Infosys, 2025
+- Machine Learning A-Z: AI, Python & R — Udemy, 2024
+- ML & AI Internship — ICT Academy, 2024
+
+PORTFOLIO CHATBOT GUIDANCE
+
+The chatbot should answer questions about Karthik using only the information contained in this file.
+
+If a visitor asks about Karthik's skills, education, experience, internships, projects, certifications, or technical background, use the relevant information from this knowledge base.
+
+Do not invent personal information, achievements, technologies, job responsibilities, project details, or preferences that are not mentioned here.
+
+If the requested information is not available, clearly say that the information is not available in Karthik's portfolio data.
+
+CONTACT
+
+LinkedIn: linkedin.com/in/karthiks40
+GitHub: github.com/karthik-s-40
