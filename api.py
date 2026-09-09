@@ -44,12 +44,16 @@ from chat import (
     KEY_TITLE,
     MESSAGE_NOT_AVAILABLE,
     MINIMUM_SIMILARITY_THRESHOLD,
+    OUT_OF_SCOPE_SYSTEM_PROMPT,
+    SAFE_DEFLECTION_MESSAGE,
     SYSTEM_PROMPT_TEMPLATE,
     TOP_K_RELEVANT_CHUNKS,
     UTF8_ENCODING,
     StoredEmbeddingRecord,
     ScoredChunkResult,
     build_context_block,
+    build_out_of_scope_reply,
+    is_restricted_query,
     load_embeddings_database,
     retrieve_relevant_chunks,
 )
@@ -144,12 +148,19 @@ class HealthResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Helper: run Qwen3 generation (blocking, collects full response)
 # ---------------------------------------------------------------------------
-def generate_answer(question_text: str, context_text: str) -> str:
+def generate_answer(
+    question_text: str,
+    context_text: str = EMPTY_STRING,
+    custom_system_prompt: str = EMPTY_STRING,
+) -> str:
     """Call Ollama Qwen3 synchronously and return the complete answer."""
-    system_prompt: str = SYSTEM_PROMPT_TEMPLATE.format(
-        not_available=MESSAGE_NOT_AVAILABLE,
-        context=context_text,
-    )
+    if custom_system_prompt:
+        system_prompt: str = custom_system_prompt
+    else:
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            not_available=MESSAGE_NOT_AVAILABLE,
+            context=context_text,
+        )
     request_payload = {
         KEY_MODEL: DEFAULT_GENERATION_MODEL,
         KEY_PROMPT: question_text,
@@ -172,12 +183,19 @@ def generate_answer(question_text: str, context_text: str) -> str:
 # ---------------------------------------------------------------------------
 # Helper: stream Qwen3 generation as SSE tokens
 # ---------------------------------------------------------------------------
-async def stream_answer_sse(question_text: str, context_text: str) -> AsyncIterator[str]:
+async def stream_answer_sse(
+    question_text: str,
+    context_text: str = EMPTY_STRING,
+    custom_system_prompt: str = EMPTY_STRING,
+) -> AsyncIterator[str]:
     """Yield Server-Sent Event chunks from Qwen3 for live UI streaming."""
-    system_prompt: str = SYSTEM_PROMPT_TEMPLATE.format(
-        not_available=MESSAGE_NOT_AVAILABLE,
-        context=context_text,
-    )
+    if custom_system_prompt:
+        system_prompt: str = custom_system_prompt
+    else:
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            not_available=MESSAGE_NOT_AVAILABLE,
+            context=context_text,
+        )
     request_payload = {
         KEY_MODEL: DEFAULT_GENERATION_MODEL,
         KEY_PROMPT: question_text,
@@ -256,8 +274,12 @@ def chat(request: ChatRequest) -> ChatResponse:
     )
 
     if not top_chunks:
+        if is_restricted_query(request.question):
+            witty_answer: str = SAFE_DEFLECTION_MESSAGE
+        else:
+            witty_answer = build_out_of_scope_reply(request.question)
         return ChatResponse(
-            answer=MESSAGE_NOT_AVAILABLE,
+            answer=witty_answer,
             sources=[],
         )
 
@@ -300,10 +322,32 @@ def chat_stream(request: ChatRequest) -> StreamingResponse:
     )
 
     if not top_chunks:
-        async def _rejected_stream() -> AsyncIterator[str]:
+        if is_restricted_query(request.question):
+            async def _restricted_stream() -> AsyncIterator[str]:
+                yield SSE_DATA_TEMPLATE.format(
+                    event=SSE_EVENT_TOKEN,
+                    data=json.dumps({"token": SAFE_DEFLECTION_MESSAGE}),
+                )
+                yield SSE_DATA_TEMPLATE.format(
+                    event=SSE_EVENT_DONE,
+                    data=json.dumps({"done": True}),
+                )
+
+            return StreamingResponse(
+                _restricted_stream(),
+                media_type=SSE_CONTENT_TYPE,
+                headers={
+                    "Cache-Control": SSE_CACHE_CONTROL,
+                    "Connection": SSE_CONNECTION,
+                },
+            )
+
+        witty_answer: str = build_out_of_scope_reply(request.question)
+
+        async def _out_of_scope_stream() -> AsyncIterator[str]:
             yield SSE_DATA_TEMPLATE.format(
                 event=SSE_EVENT_TOKEN,
-                data=json.dumps({"token": MESSAGE_NOT_AVAILABLE}),
+                data=json.dumps({"token": witty_answer}),
             )
             yield SSE_DATA_TEMPLATE.format(
                 event=SSE_EVENT_DONE,
@@ -311,7 +355,7 @@ def chat_stream(request: ChatRequest) -> StreamingResponse:
             )
 
         return StreamingResponse(
-            _rejected_stream(),
+            _out_of_scope_stream(),
             media_type=SSE_CONTENT_TYPE,
             headers={
                 "Cache-Control": SSE_CACHE_CONTROL,

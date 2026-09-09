@@ -1,6 +1,7 @@
 import AnimatedBackground from "./components/animated-background";
 import Navbar from "./components/navbar";
 import HeroSection from "./components/hero-section";
+import ChatSection from "./components/chat-section";
 import AboutSection from "./components/about-section";
 import SkillsSection from "./components/skills-section";
 import ExperienceSection from "./components/experience-section";
@@ -19,6 +20,7 @@ export default function Home() {
 
       <main className="relative z-10">
         <HeroSection />
+        <ChatSection />
         <AboutSection />
         <SkillsSection />
         <ExperienceSection />

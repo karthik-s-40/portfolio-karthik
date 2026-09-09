@@ -16,6 +16,7 @@ import type {
   CertificationEntry,
   ContactLink,
   NavItem,
+  ChatConfig,
 } from "./types";
 
 /* ------------------------------------------------------------------ */
@@ -27,6 +28,7 @@ export const EMPTY_STRING = "";
 /*  Navigation                                                         */
 /* ------------------------------------------------------------------ */
 export const NAV_ITEMS: readonly NavItem[] = [
+  { label: "Ask AI", href: "#ask-ai" },
   { label: "About", href: "#about" },
   { label: "Skills", href: "#skills" },
   { label: "Experience", href: "#experience" },
@@ -36,6 +38,25 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: "Certifications", href: "#certifications" },
   { label: "Contact", href: "#contact" },
 ] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Chat Assistant Configuration                                       */
+/* ------------------------------------------------------------------ */
+export const CHAT_CONFIG: ChatConfig = {
+  title: "Ask Karthik's AI",
+  badge: "Powered by Qwen 3 + RAG",
+  placeholder: "type your question...",
+  sendButtonAria: "Send question",
+  streamEndpoint: "http://localhost:8000/chat/stream",
+  suggestions: [
+    "What do you do in your current role?",
+    "What's your experience with AI interfaces?",
+    "Walk me through your career",
+  ],
+  statusThinking: "Thinking...",
+  statusError: "Unable to connect to local Qwen model. Please ensure the Python API is running on port 8000.",
+  offlineNotice: "RAG • Qwen 3:1.7b",
+} as const;
 
 /* ------------------------------------------------------------------ */
 /*  Hero                                                               */

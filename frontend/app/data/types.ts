@@ -91,3 +91,21 @@ export interface NavItem {
   readonly label: string;
   readonly href: string;
 }
+
+export interface ChatMessage {
+  readonly id: string;
+  readonly role: "user" | "assistant";
+  readonly content: string;
+}
+
+export interface ChatConfig {
+  readonly title: string;
+  readonly badge: string;
+  readonly placeholder: string;
+  readonly sendButtonAria: string;
+  readonly streamEndpoint: string;
+  readonly suggestions: readonly string[];
+  readonly statusThinking: string;
+  readonly statusError: string;
+  readonly offlineNotice: string;
+}

@@ -11,11 +11,11 @@ Workflow:
 """
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
 from typing import Iterator, List, Set, TypedDict
-import numpy as np
 import requests
 
 # ---------------------------------------------------------------------------
@@ -67,6 +67,82 @@ SYSTEM_PROMPT_TEMPLATE: str = (
     "Context:\n"
     "{context}"
 )
+
+# Out-of-scope witty system prompt — handles casual/personal topics with charm and tech humor
+OUT_OF_SCOPE_SYSTEM_PROMPT: str = (
+    "You are Karthik S, a Data Science graduate and Junior Developer with a passion for "
+    "machine learning, data engineering, and AI.\n"
+    "A visitor has asked you a casual or personal question outside the scope of your portfolio data "
+    "(e.g. love life, dating, hobbies, cooking, casual chat).\n\n"
+    "RESPONSE RULES:\n"
+    "1. Answer in first person ONLY ('I', 'me', 'my'). Never refer to yourself as 'Karthik' or in the third person.\n"
+    "2. Give a witty, charming, lighthearted, and clever reply in 1 to 2 sentences.\n"
+    "3. Keep the tone respectful, friendly, and professional.\n"
+    "4. Redirect gently back to technology, projects, skills, or experience.\n"
+    "5. Use wording similar to: 'I keep the conversation focused on tech, projects, and experience—my favorite kind of drama is a clean deployment, not a random off-topic detour. Ask me about my work, skills, or the problems I’ve built solutions for.'\n"
+    "6. STRICT CONTENT GUIDELINES (MANDATORY):\n"
+    "   - Absolutely NO offensive, rude, or vulgar language.\n"
+    "   - Absolutely NO political statements, debates, commentary, or mentions of politicians/governments.\n"
+    "   - Absolutely NO racial, ethnic, religious, or discriminatory remarks.\n"
+    "   - Absolutely NO sexual, intimate, explicit, or suggestive remarks.\n"
+    "7. Always remain respectful, courteous, positive, and professional."
+)
+
+# Content guardrail regex to enforce clean, respectful interactions
+RESTRICTED_TOPICS_REGEX: str = (
+    r"\b(politics|politician|democrat|republican|election|vote|racism|racial|"
+    r"sexual|sex|nsfw|nude|porn|explicit|curse|swear)\b"
+)
+
+SAFE_DEFLECTION_MESSAGE: str = (
+    "I prefer to keep things strictly professional and focused on data science, "
+    "machine learning, and software engineering! What would you like to know about "
+    "my projects, skills, or experience?"
+)
+
+
+def build_out_of_scope_reply(query_text: str) -> str:
+    """Generate a witty but safe fallback via the model, with a static fallback if the model call fails."""
+    request_payload = {
+        KEY_MODEL: DEFAULT_GENERATION_MODEL,
+        KEY_PROMPT: query_text,
+        KEY_SYSTEM: OUT_OF_SCOPE_SYSTEM_PROMPT,
+        KEY_STREAM: False,
+    }
+
+    try:
+        response = requests.post(
+            DEFAULT_OLLAMA_GENERATE_URL,
+            json=request_payload,
+            timeout=HTTP_GENERATE_TIMEOUT_SECONDS,
+        )
+        if response.status_code == HTTP_STATUS_CODE_OK:
+            generated_text = response.json().get(KEY_RESPONSE, EMPTY_STRING).strip()
+            if generated_text:
+                return generated_text
+    except Exception:
+        pass
+
+    return (
+        "I keep the conversation focused on tech, projects, and experience—my favorite kind of drama is a clean deployment, not a random off-topic detour. "
+        "Ask me about my work, skills, or the problems I’ve built solutions for."
+    )
+
+
+def is_personal_out_of_scope_query(query_text: str) -> bool:
+    """Use a lightweight personal-topic filter as a guardrail, not a custom response map."""
+    normalized_query: str = query_text.lower()
+    personal_pattern = re.compile(
+        r"\b(hey|hi|hello|yo|how\s+are\s+you|good\s+(morning|evening)|what\s*['’]?s\s+up|"
+        r"love\s+life|love|dating|relationship|romance|single|married|girlfriend|boyfriend|partner|"
+        r"hobby|hobbies)\b"
+    )
+    return bool(personal_pattern.search(normalized_query))
+
+
+def is_restricted_query(query_text: str) -> bool:
+    """Check if query touches restricted political, racial, sexual, or offensive topics."""
+    return bool(re.search(RESTRICTED_TOPICS_REGEX, query_text, re.IGNORECASE))
 
 # Payload and Record Keys
 KEY_SECTION: str = "section"
@@ -179,21 +255,23 @@ def fetch_question_embedding(
     if KEY_EMBEDDING not in response_payload:
         raise KeyError(ERROR_MISSING_EMBEDDING_KEY)
 
-    question_vector: np.ndarray = np.array(
-        response_payload[KEY_EMBEDDING], dtype=np.float32
-    )
+    question_vector: List[float] = [
+        float(val) for val in response_payload[KEY_EMBEDDING]
+    ]
     return question_vector
 
 
 def calculate_cosine_similarity(
-    first_vector: np.ndarray,
-    second_vector: np.ndarray,
+    first_vector: List[float],
+    second_vector: List[float],
 ) -> float:
     """Compute normalized cosine similarity between two numeric vectors."""
-    dot_product_value: float = float(np.dot(first_vector, second_vector))
-    denominator_value: float = float(
-        np.linalg.norm(first_vector) * np.linalg.norm(second_vector)
+    dot_product_value: float = sum(
+        first * second for first, second in zip(first_vector, second_vector)
     )
+    norm_first: float = math.sqrt(sum(first * first for first in first_vector))
+    norm_second: float = math.sqrt(sum(second * second for second in second_vector))
+    denominator_value: float = norm_first * norm_second
     if denominator_value < EPSILON_DENOMINATOR:
         return 0.0
     return dot_product_value / denominator_value
@@ -234,10 +312,13 @@ def retrieve_relevant_chunks(
     api_url: str = DEFAULT_OLLAMA_EMBEDDINGS_URL,
 ) -> List[ScoredChunkResult]:
     """Find top chunks and enforce threshold to reject out-of-scope queries."""
+    if is_personal_out_of_scope_query(question_text):
+        return []
+
     # Rewrite first-person pronouns to third-person so queries like
     # "Where did you work?" match the third-person corpus correctly.
     retrieval_query: str = rewrite_query_for_retrieval(query_text=question_text)
-    question_vector: np.ndarray = fetch_question_embedding(
+    question_vector: List[float] = fetch_question_embedding(
         question_text=retrieval_query,
         model_name=model_name,
         api_url=api_url,
@@ -245,9 +326,9 @@ def retrieve_relevant_chunks(
 
     scored_candidates: List[ScoredChunkResult] = []
     for record in stored_records:
-        candidate_vector: np.ndarray = np.array(
-            record[KEY_EMBEDDING], dtype=np.float32
-        )
+        candidate_vector: List[float] = [
+            float(val) for val in record[KEY_EMBEDDING]
+        ]
         similarity: float = calculate_cosine_similarity(
             first_vector=question_vector,
             second_vector=candidate_vector,
@@ -318,12 +399,16 @@ def stream_qwen3_response(
     context_text: str,
     model_name: str = DEFAULT_GENERATION_MODEL,
     api_url: str = DEFAULT_OLLAMA_GENERATE_URL,
+    custom_system_prompt: str = EMPTY_STRING,
 ) -> Iterator[str]:
-    """Stream Qwen3 answer tokens from Ollama using the retrieved context."""
-    system_prompt: str = SYSTEM_PROMPT_TEMPLATE.format(
-        not_available=MESSAGE_NOT_AVAILABLE,
-        context=context_text,
-    )
+    """Stream Qwen3 answer tokens from Ollama using the retrieved context or custom system prompt."""
+    if custom_system_prompt:
+        system_prompt: str = custom_system_prompt
+    else:
+        system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+            not_available=MESSAGE_NOT_AVAILABLE,
+            context=context_text,
+        )
 
     request_payload = {
         KEY_MODEL: model_name,
@@ -387,10 +472,14 @@ def main() -> None:
         similarity_threshold=MINIMUM_SIMILARITY_THRESHOLD,
     )
 
-    # Step 5: Ground check — if no relevant chunks, reject immediately
+    # Step 5: Ground check — if no relevant chunks, answer with witty out-of-scope reply
     if not top_chunks:
         print(LABEL_ANSWER_HEADER)
-        print(MESSAGE_NOT_AVAILABLE)
+        if is_restricted_query(question_input):
+            print(SAFE_DEFLECTION_MESSAGE)
+        else:
+            print(build_out_of_scope_reply(question_input))
+        print(DOUBLE_NEWLINE_STRING)
         return
 
     # Step 6: Build context block from retrieved chunks
