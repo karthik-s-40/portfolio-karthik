@@ -8,7 +8,6 @@ import { HERO_DATA } from "@/app/data/portfolio-data";
 
 const SCROLL_OFFSET = 120;
 const MOBILE_MENU_DURATION = 0.25;
-const NAV_LOGO_INITIALS = "KS";
 
 export default function Navbar() {
   const [activeSection, setActiveSection] = useState("");
@@ -53,25 +52,24 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 glass-nav transition-shadow duration-300 ${
-        isScrolled ? "shadow-lg shadow-black/20" : ""
+      className={`fixed top-3 left-0 right-0 z-50 px-4 transition-all duration-300 ${
+        isScrolled ? "" : ""
       }`}
       role="navigation"
       aria-label="Main navigation"
     >
-      <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-[var(--nav-height)]">
+      <div className={`max-w-6xl mx-auto glass-nav rounded-2xl border px-4 flex items-center justify-between h-[var(--nav-height)] shadow-[0_20px_50px_rgba(15,23,42,0.45)] transition-all duration-300 ${
+        isScrolled ? "border-white/10" : "border-white/5"
+      }`}>
         {/* Logo */}
         <a
           href="#"
-          className="flex items-center gap-2 text-lg font-bold tracking-tight group"
+          className="flex items-center text-lg font-bold tracking-tight group"
           aria-label={`${HERO_DATA.name} — home`}
           onClick={closeMobileMenu}
         >
-          <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--accent-start)] to-[var(--accent-royal)] flex items-center justify-center text-sm font-black text-white transition-transform duration-300 group-hover:scale-110">
-            {NAV_LOGO_INITIALS}
-          </span>
-          <span className="hidden sm:inline text-[var(--text-primary)]">
-            {HERO_DATA.name}
+          <span className="hidden sm:flex items-center text-[var(--text-primary)]">
+            <span className="text-[1.08rem] font-medium tracking-[-0.06em]">{HERO_DATA.name}</span>
           </span>
         </a>
 

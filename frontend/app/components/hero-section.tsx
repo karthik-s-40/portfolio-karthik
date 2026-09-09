@@ -61,7 +61,7 @@ export default function HeroSection() {
       >
         {/* Specialization status badge */}
         <motion.div variants={shouldReduceMotion ? undefined : itemVariants}>
-          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase border border-[var(--accent-start)]/30 bg-[var(--accent-start)]/10 text-[var(--accent-start)] mb-8">
+          <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-semibold tracking-[0.2em] uppercase border border-white/10 bg-white/5 text-slate-200 shadow-[0_0_24px_rgba(124,58,237,0.18)] mb-8">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             {HERO_DATA.focusBadge}
           </span>
@@ -70,7 +70,7 @@ export default function HeroSection() {
         {/* Name */}
         <motion.h1
           variants={shouldReduceMotion ? undefined : itemVariants}
-          className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-tight leading-[1.05] mb-6"
+          className="text-5xl sm:text-6xl md:text-7xl lg:text-[6.3rem] font-black tracking-[-0.06em] leading-[0.94] mb-6"
         >
           <span className="gradient-text-shimmer">{HERO_DATA.name}</span>
         </motion.h1>
@@ -78,7 +78,7 @@ export default function HeroSection() {
         {/* Role */}
         <motion.p
           variants={shouldReduceMotion ? undefined : itemVariants}
-          className="text-xl sm:text-2xl md:text-3xl font-semibold text-[var(--text-secondary)] mb-6"
+          className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-[-0.03em] text-[var(--text-secondary)] mb-6"
         >
           {HERO_DATA.role}
         </motion.p>

@@ -99,7 +99,7 @@ export default function SkillsSection() {
                   delay: categoryIndex * STAGGER_DELAY,
                   ease: "easeOut",
                 }}
-                className={`glass-card glass-card-hover p-6 flex flex-col relative ${
+                className={`glass-card glass-card-hover p-5 flex flex-col relative h-full ${
                   category.isCoreDS
                     ? "border-[var(--accent-start)]/35 shadow-sm shadow-[var(--accent-start)]/5"
                     : ""
@@ -115,20 +115,20 @@ export default function SkillsSection() {
                 )}
 
                 {/* Category header */}
-                <div className="flex items-center gap-3 mb-4 pr-16">
+                <div className="flex items-center gap-3 mb-3 pr-16">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--accent-start)]/20 to-[var(--accent-royal)]/10 flex items-center justify-center shrink-0">
                     <IconComponent
                       size={20}
                       className="text-[var(--accent-start)]"
                     />
                   </div>
-                  <h3 className="text-base font-semibold text-[var(--text-primary)]">
+                  <h3 className="text-base font-semibold text-[var(--text-primary)] leading-tight">
                     {category.category}
                   </h3>
                 </div>
 
                 {/* Skill pills */}
-                <div className="flex flex-wrap gap-2 mt-auto">
+                <div className="flex flex-wrap gap-2">
                   {category.skills.map((skill) => (
                     <span
                       key={skill.name}

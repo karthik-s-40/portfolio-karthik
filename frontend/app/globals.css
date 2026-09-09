@@ -4,29 +4,29 @@
 /*  Design Tokens — Indigo-to-Royal Blue Dark Theme                    */
 /* ------------------------------------------------------------------ */
 :root {
-  --bg-primary: #06080f;
-  --bg-secondary: #0c1120;
-  --bg-tertiary: #111827;
-  --bg-card: #0f172a;
-  --bg-card-hover: #131d36;
+  --bg-primary: #050816;
+  --bg-secondary: #0b1120;
+  --bg-tertiary: #101827;
+  --bg-card: rgba(15, 23, 42, 0.8);
+  --bg-card-hover: rgba(17, 24, 39, 0.95);
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-tertiary: #64748b;
+  --text-primary: #e5eefb;
+  --text-secondary: #a7b7d1;
+  --text-tertiary: #7d8aa5;
 
-  --accent-start: #6366f1;
+  --accent-start: #7c3aed;
   --accent-mid: #4f46e5;
-  --accent-end: #3b30cc;
-  --accent-royal: #4338ca;
-  --accent-glow: #6366f180;
-  --accent-glow-strong: #6366f140;
+  --accent-end: #06b6d4;
+  --accent-royal: #3b82f6;
+  --accent-glow: rgba(124, 58, 237, 0.45);
+  --accent-glow-strong: rgba(59, 130, 246, 0.28);
 
-  --border-subtle: #1e293b;
-  --border-accent: #6366f130;
+  --border-subtle: rgba(148, 163, 184, 0.18);
+  --border-accent: rgba(124, 58, 237, 0.28);
 
-  --glass-bg: #0f172a80;
-  --glass-border: #6366f120;
-  --glass-blur: 16px;
+  --glass-bg: rgba(10, 14, 24, 0.66);
+  --glass-border: rgba(148, 163, 184, 0.14);
+  --glass-blur: 20px;
 
   --nav-height: 4.5rem;
 
@@ -63,7 +63,10 @@ html {
 }
 
 body {
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at top left, rgba(124, 58, 237, 0.16), transparent 32%),
+    radial-gradient(circle at top right, rgba(6, 182, 212, 0.14), transparent 30%),
+    linear-gradient(180deg, #050816 0%, #0a1020 100%);
   color: var(--text-primary);
   font-family: var(--font-sans);
   line-height: 1.7;
@@ -71,7 +74,7 @@ body {
 }
 
 ::selection {
-  background: var(--accent-start);
+  background: rgba(124, 58, 237, 0.45);
   color: var(--text-primary);
 }
 
@@ -79,27 +82,28 @@ body {
 /*  Glassmorphism Utilities                                            */
 /* ------------------------------------------------------------------ */
 .glass-card {
-  background: var(--glass-bg);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.72));
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
-  border-radius: 1rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.38);
 }
 
 .glass-card-hover {
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-card-hover:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--accent-start);
-  box-shadow: 0 0 30px var(--accent-glow-strong), 0 8px 32px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(17, 24, 39, 0.9));
+  border-color: rgba(124, 58, 237, 0.45);
+  box-shadow: 0 24px 60px rgba(76, 29, 149, 0.24), 0 0 0 1px rgba(124, 58, 237, 0.22);
   transform: translateY(-4px);
 }
 
 .glass-nav {
-  background: rgba(6, 8, 15, 0.8);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: rgba(10, 14, 24, 0.62);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -107,7 +111,7 @@ body {
 /*  Gradient Text                                                      */
 /* ------------------------------------------------------------------ */
 .gradient-text {
-  background: linear-gradient(135deg, var(--accent-start), #818cf8, var(--accent-royal));
+  background: linear-gradient(135deg, #d8b4fe 0%, #8b5cf6 28%, #60a5fa 65%, #22d3ee 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -116,11 +120,11 @@ body {
 .gradient-text-shimmer {
   background: linear-gradient(
     90deg,
-    var(--accent-start),
-    #818cf8,
-    var(--accent-royal),
-    #818cf8,
-    var(--accent-start)
+    #f5d0fe,
+    #c4b5fd,
+    #7dd3fc,
+    #c4b5fd,
+    #f5d0fe
   );
   background-size: 300% 100%;
   -webkit-background-clip: text;
