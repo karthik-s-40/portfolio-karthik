@@ -1,0 +1,348 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/*  Design Tokens — Indigo-to-Royal Blue Dark Theme                    */
+/* ------------------------------------------------------------------ */
+:root {
+  --bg-primary: #06080f;
+  --bg-secondary: #0c1120;
+  --bg-tertiary: #111827;
+  --bg-card: #0f172a;
+  --bg-card-hover: #131d36;
+
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  --accent-start: #6366f1;
+  --accent-mid: #4f46e5;
+  --accent-end: #3b30cc;
+  --accent-royal: #4338ca;
+  --accent-glow: #6366f180;
+  --accent-glow-strong: #6366f140;
+
+  --border-subtle: #1e293b;
+  --border-accent: #6366f130;
+
+  --glass-bg: #0f172a80;
+  --glass-border: #6366f120;
+  --glass-blur: 16px;
+
+  --nav-height: 4.5rem;
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", monospace;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Base Styles                                                        */
+/* ------------------------------------------------------------------ */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: var(--nav-height);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--accent-start);
+  color: var(--text-primary);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Glassmorphism Utilities                                            */
+/* ------------------------------------------------------------------ */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+}
+
+.glass-card-hover {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.glass-card-hover:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-start);
+  box-shadow: 0 0 30px var(--accent-glow-strong), 0 8px 32px rgba(0, 0, 0, 0.4);
+  transform: translateY(-4px);
+}
+
+.glass-nav {
+  background: rgba(6, 8, 15, 0.8);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Gradient Text                                                      */
+/* ------------------------------------------------------------------ */
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-start), #818cf8, var(--accent-royal));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--accent-start),
+    #818cf8,
+    var(--accent-royal),
+    #818cf8,
+    var(--accent-start)
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 6s ease-in-out infinite;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Keyframe Animations                                                */
+/* ------------------------------------------------------------------ */
+@keyframes shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  33% {
+    transform: translateY(-16px) rotate(1deg);
+  }
+  66% {
+    transform: translateY(8px) rotate(-1deg);
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-30px) scale(1.05);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Animated Background Orbs                                           */
+/* ------------------------------------------------------------------ */
+.bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(100px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--accent-start), transparent 70%);
+  top: -200px;
+  right: -200px;
+  opacity: 0.15;
+  animation: float-slow 20s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, var(--accent-royal), transparent 70%);
+  bottom: 20%;
+  left: -200px;
+  opacity: 0.1;
+  animation: float-slow 25s ease-in-out infinite reverse;
+}
+
+.bg-orb-3 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #818cf8, transparent 70%);
+  top: 50%;
+  right: -100px;
+  opacity: 0.08;
+  animation: float-slow 18s ease-in-out infinite 3s;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section Divider Gradient                                           */
+/* ------------------------------------------------------------------ */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-start),
+    var(--accent-royal),
+    transparent
+  );
+  opacity: 0.3;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Skill Pill Tag                                                     */
+/* ------------------------------------------------------------------ */
+.skill-pill {
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(67, 56, 202, 0.08));
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #c7d2fe;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.skill-pill:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(67, 56, 202, 0.18));
+  border-color: var(--accent-start);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Timeline                                                           */
+/* ------------------------------------------------------------------ */
+.timeline-line {
+  position: absolute;
+  left: 1.125rem;
+  top: 2.5rem;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--accent-start), var(--accent-royal), transparent);
+}
+
+.timeline-dot {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  background: var(--accent-start);
+  box-shadow: 0 0 12px var(--accent-glow);
+  border: 2px solid var(--bg-primary);
+  flex-shrink: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Button Styles                                                      */
+/* ------------------------------------------------------------------ */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: linear-gradient(135deg, var(--accent-start), var(--accent-royal));
+  color: white;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px var(--accent-glow);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 2rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn-secondary:hover {
+  border-color: var(--accent-start);
+  background: rgba(99, 102, 241, 0.08);
+  transform: translateY(-2px);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Scrollbar                                                          */
+/* ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-start);
+}
