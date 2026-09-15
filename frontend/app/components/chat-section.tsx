@@ -27,12 +27,12 @@ export default function ChatSection() {
   const responseContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll response container when new tokens stream in
+  // Ensure response starts scrolled to top so user reads from the beginning
   useEffect(() => {
     if (responseContainerRef.current) {
-      responseContainerRef.current.scrollTop = responseContainerRef.current.scrollHeight;
+      responseContainerRef.current.scrollTop = 0;
     }
-  }, [responseContent]);
+  }, [activeQuestion]);
 
   const handleSendQuestion = useCallback(async (queryToSend: string) => {
     const trimmedQuery = queryToSend.trim();
@@ -44,6 +44,10 @@ export default function ChatSection() {
     setHasError(false);
     setErrorMessage(EMPTY_STRING);
     setIsStreaming(true);
+
+    if (responseContainerRef.current) {
+      responseContainerRef.current.scrollTop = 0;
+    }
 
     try {
       const response = await fetch(CHAT_CONFIG.streamEndpoint, {
