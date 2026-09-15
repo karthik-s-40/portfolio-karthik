@@ -44,7 +44,7 @@ DEFAULT_EMBEDDING_MODEL: str = "all-minilm"
 DEFAULT_GENERATION_MODEL: str = "qwen3:1.7b"
 
 TOP_K_RELEVANT_CHUNKS: int = 3
-MINIMUM_SIMILARITY_THRESHOLD: float = 0.35
+MINIMUM_SIMILARITY_THRESHOLD: float = 0.25
 STRONG_SIMILARITY_THRESHOLD: float = 0.65
 UTF8_ENCODING: str = "utf-8"
 HTTP_EMBEDDING_TIMEOUT_SECONDS: int = 30
@@ -197,13 +197,38 @@ FIRST_PERSON_PRONOUN_MAP: dict = {
 
 # Stop Words for Entity & Topic Presence Verification
 STOP_WORDS: Set[str] = {
-    "a", "about", "am", "an", "and", "are", "as", "at", "be", "by", "did",
-    "do", "does", "for", "from", "had", "has", "have", "he", "her", "him",
-    "his", "how", "i", "in", "is", "it", "its", "karthik", "karthik's",
-    "me", "my", "of", "on", "or", "our", "show", "tell", "the", "their",
-    "them", "then", "there", "these", "they", "this", "to", "was", "were",
-    "what", "when", "where", "which", "who", "whom", "why", "with", "would",
+    "a", "about", "am", "an", "and", "are", "as", "at", "be", "by", "can", "could",
+    "did", "do", "does", "for", "from", "had", "has", "have", "he", "her", "him",
+    "his", "how", "i", "in", "is", "it", "its", "karthik", "karthik's", "me", "my",
+    "of", "on", "or", "our", "please", "show", "tell", "the", "their", "them",
+    "then", "there", "these", "they", "this", "through", "to", "us", "walk", "was",
+    "we", "were", "what", "what's", "whats", "when", "where", "which", "who",
+    "whom", "why", "will", "with", "would", "you", "your", "yours",
 }
+
+# Domain & Topic Synonym Expansions for Lexical Retrieval
+SYNONYMS_MAP: dict = {
+    "interface": ["ui", "web", "application", "chatbot", "frontend"],
+    "interfaces": ["ui", "web", "application", "chatbot", "frontend"],
+    "ai": ["artificial", "intelligence", "rag", "machine", "learning", "generative"],
+    "ml": ["machine", "learning"],
+    "career": ["summary", "experience", "internship", "corporate", "developer", "education"],
+    "background": ["summary", "experience", "education"],
+    "role": ["corporate", "experience", "developer", "sam"],
+    "skills": ["programming", "technologies", "tools", "visualization", "engineering"],
+    "skill": ["programming", "technologies", "tools", "visualization", "engineering"],
+    "education": ["school", "engineering", "technology", "college", "degree"],
+}
+
+
+def match_token(token: str, word: str) -> float:
+    """Check exact match or stem/prefix match for plurals/variations."""
+    if token == word:
+        return 1.0
+    if len(token) > 3 and len(word) > 3:
+        if token.startswith(word[:4]) or word.startswith(token[:4]):
+            return 0.8
+    return 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +342,7 @@ def extract_query_topics(query_text: str) -> List[str]:
     """Extract substantive keyword tokens from query excluding stop words."""
     cleaned_tokens: List[str] = re.findall(r"\b[a-zA-Z0-9]+\b", query_text.lower())
     substantive_topics: List[str] = [
-        token for token in cleaned_tokens if token not in STOP_WORDS and len(token) > 2
+        token for token in cleaned_tokens if token not in STOP_WORDS and len(token) >= 2
     ]
     return substantive_topics
 
@@ -367,26 +392,38 @@ def retrieve_relevant_chunks(
             )
     else:
         # Zero-dependency Lexical Keyword Matching (works in any cloud host without Ollama)
-        tokens: List[str] = extract_query_topics(query_text=question_text)
-        if not tokens:
-            tokens = [
-                t for t in re.findall(r"\b[a-zA-Z0-9]+\b", question_text.lower()) if len(t) > 2
+        raw_tokens: List[str] = extract_query_topics(query_text=question_text)
+        if not raw_tokens:
+            raw_tokens = [
+                t for t in re.findall(r"\b[a-zA-Z0-9]+\b", question_text.lower()) if len(t) >= 2 and t not in STOP_WORDS
             ]
 
+        expanded_tokens: List[str] = list(raw_tokens)
+        for token in raw_tokens:
+            if token in SYNONYMS_MAP:
+                expanded_tokens.extend(SYNONYMS_MAP[token])
+
         for record in stored_records:
-            title_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_TITLE].lower()))
-            section_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_SECTION].lower()))
+            title_words = re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_TITLE].lower())
+            section_words = re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_SECTION].lower())
             text_words = re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_TEXT].lower())
 
             score: float = 0.0
-            for token in tokens:
-                if token in title_words:
-                    score += 0.45
-                if token in section_words:
-                    score += 0.25
-                match_count = text_words.count(token)
+            for token in expanded_tokens:
+                is_direct = token in raw_tokens
+                weight = 1.0 if is_direct else 0.5
+
+                title_match = max([match_token(token, w) for w in title_words] or [0.0])
+                if title_match:
+                    score += 0.45 * title_match * weight
+
+                sec_match = max([match_token(token, w) for w in section_words] or [0.0])
+                if sec_match:
+                    score += 0.30 * sec_match * weight
+
+                match_count = sum(1 for w in text_words if match_token(token, w) > 0.7)
                 if match_count:
-                    score += min(0.35, 0.1 * match_count)
+                    score += min(0.35, 0.1 * match_count) * weight
 
             if score > 0:
                 scored_candidates.append(
@@ -420,8 +457,12 @@ def retrieve_relevant_chunks(
                 f"{record[KEY_SECTION]} {record[KEY_TITLE]} {record[KEY_TEXT]}"
                 for record in stored_records
             ).lower()
+            corpus_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", entire_corpus_text))
             topic_matched: bool = any(
-                topic in entire_corpus_text for topic in question_topics
+                topic in corpus_words
+                or any(match_token(topic, w) > 0.7 for w in corpus_words)
+                or topic in SYNONYMS_MAP
+                for topic in question_topics
             )
             if not topic_matched:
                 return []
