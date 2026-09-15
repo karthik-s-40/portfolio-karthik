@@ -59,10 +59,11 @@ ollama pull qwen3:1.7b
 
 ```bash
 portfolio-karthik/
-├── api.py
-├── chat.py
-├── generate-embeddings.py
-├── embeddings.json
+├── backend/
+│   ├── api.py
+│   ├── chat.py
+│   ├── generate-embeddings.py
+│   └── embeddings.json
 ├── data/
 │   └── about-me.txt
 ├── frontend/
@@ -107,19 +108,19 @@ pip install fastapi uvicorn requests numpy pydantic
 ### 4. Regenerate embeddings if the source content changed
 
 ```bash
-python generate-embeddings.py
+python backend/generate-embeddings.py
 ```
 
 ### 5. Run the backend API
 
 ```bash
-python api.py
+python backend/api.py
 ```
 
 or:
 
 ```bash
-uvicorn api:application --host 0.0.0.0 --port 8000 --reload
+uvicorn backend.api:application --host 0.0.0.0 --port 8000 --reload
 ```
 
 The backend will be available at:

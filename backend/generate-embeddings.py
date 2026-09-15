@@ -408,7 +408,16 @@ def save_embeddings_to_json(
 def main() -> None:
     """Execute end-to-end dynamic embedding pipeline reading from about-me.txt."""
     base_directory: Path = Path(__file__).resolve().parent
-    input_file_path: Path = base_directory / DEFAULT_INPUT_FILE_PATH
+    input_candidates: List[Path] = [
+        base_directory.parent / DEFAULT_INPUT_FILE_PATH,
+        base_directory / DEFAULT_INPUT_FILE_PATH,
+        Path.cwd() / DEFAULT_INPUT_FILE_PATH,
+        Path.cwd().parent / DEFAULT_INPUT_FILE_PATH,
+    ]
+    input_file_path: Path = next(
+        (candidate for candidate in input_candidates if candidate.is_file()),
+        base_directory.parent / DEFAULT_INPUT_FILE_PATH,
+    )
     output_file_path: Path = base_directory / DEFAULT_OUTPUT_FILE_PATH
 
     application_logger.info(LOG_INFO_READING_FILE, str(input_file_path))

@@ -12,11 +12,16 @@ Workflow:
 
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
 from typing import Iterator, List, Set, TypedDict
 import requests
+import numpy as np
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -29,9 +34,12 @@ DEFAULT_SAMPLE_QUESTION: str = (
     "What machine learning projects has Karthik worked on?"
 )
 DEFAULT_EMBEDDINGS_FILE_PATH: str = "embeddings.json"
-DEFAULT_OLLAMA_BASE_URL: str = "http://localhost:11434"
+DEFAULT_OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 DEFAULT_OLLAMA_EMBEDDINGS_URL: str = f"{DEFAULT_OLLAMA_BASE_URL}/api/embeddings"
 DEFAULT_OLLAMA_GENERATE_URL: str = f"{DEFAULT_OLLAMA_BASE_URL}/api/generate"
+HF_EMBEDDING_API_URL: str = (
+    "https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2"
+)
 DEFAULT_EMBEDDING_MODEL: str = "all-minilm"
 DEFAULT_GENERATION_MODEL: str = "qwen3:1.7b"
 
@@ -233,32 +241,47 @@ def fetch_question_embedding(
     question_text: str,
     model_name: str = DEFAULT_EMBEDDING_MODEL,
     api_url: str = DEFAULT_OLLAMA_EMBEDDINGS_URL,
-) -> np.ndarray:
-    """Send user question to Ollama all-minilm and return the vector."""
-    request_payload = {
-        KEY_MODEL: model_name,
-        KEY_PROMPT: question_text,
-    }
-
-    response = requests.post(
-        api_url,
-        json=request_payload,
-        timeout=HTTP_EMBEDDING_TIMEOUT_SECONDS,
-    )
-
-    if response.status_code != HTTP_STATUS_CODE_OK:
-        raise RuntimeError(
-            ERROR_HTTP_EMBEDDING_FAILED % (response.status_code, response.text)
+) -> List[float]:
+    """Fetch user question embedding vector via local Ollama or Hugging Face cloud API."""
+    # 1. Attempt local Ollama embedding if accessible
+    try:
+        request_payload = {
+            KEY_MODEL: model_name,
+            KEY_PROMPT: question_text,
+        }
+        response = requests.post(
+            api_url,
+            json=request_payload,
+            timeout=5,
         )
+        if response.status_code == HTTP_STATUS_CODE_OK:
+            response_payload = response.json()
+            if KEY_EMBEDDING in response_payload:
+                return [float(val) for val in response_payload[KEY_EMBEDDING]]
+    except requests.exceptions.RequestException:
+        pass
 
-    response_payload = response.json()
-    if KEY_EMBEDDING not in response_payload:
-        raise KeyError(ERROR_MISSING_EMBEDDING_KEY)
+    # 2. Cloud Fallback: Use Hugging Face Inference API for all-MiniLM-L6-v2
+    hf_token: str = os.getenv("HF_TOKEN", EMPTY_STRING)
+    hf_headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
+    try:
+        hf_response = requests.post(
+            HF_EMBEDDING_API_URL,
+            headers=hf_headers,
+            json={"inputs": [question_text], "options": {"wait_for_model": True}},
+            timeout=15,
+        )
+        if hf_response.status_code == HTTP_STATUS_CODE_OK:
+            data = hf_response.json()
+            if isinstance(data, list) and len(data) > 0:
+                raw_vector = data[0] if isinstance(data[0], list) else data
+                return [float(val) for val in raw_vector]
+    except requests.exceptions.RequestException:
+        pass
 
-    question_vector: List[float] = [
-        float(val) for val in response_payload[KEY_EMBEDDING]
-    ]
-    return question_vector
+    raise RuntimeError(
+        "Could not generate question embedding: neither local Ollama nor cloud embedding service responded."
+    )
 
 
 def calculate_cosine_similarity(
@@ -446,7 +469,16 @@ def stream_qwen3_response(
 def main() -> None:
     """Execute the full RAG pipeline: retrieve → ground → generate."""
     base_directory: Path = Path(__file__).resolve().parent
-    embeddings_file_path: Path = base_directory / DEFAULT_EMBEDDINGS_FILE_PATH
+    candidates: List[Path] = [
+        base_directory / DEFAULT_EMBEDDINGS_FILE_PATH,
+        base_directory.parent / DEFAULT_EMBEDDINGS_FILE_PATH,
+        Path.cwd() / "backend" / DEFAULT_EMBEDDINGS_FILE_PATH,
+        Path.cwd() / DEFAULT_EMBEDDINGS_FILE_PATH,
+    ]
+    embeddings_file_path: Path = next(
+        (candidate for candidate in candidates if candidate.is_file()),
+        base_directory / DEFAULT_EMBEDDINGS_FILE_PATH,
+    )
 
     stored_records: List[StoredEmbeddingRecord] = load_embeddings_database(
         file_path=embeddings_file_path

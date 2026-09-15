@@ -15,61 +15,108 @@ in development so any local frontend can connect without configuration changes.
 """
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import AsyncIterator, List
 
 import requests as sync_requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Ensure backend directory is in sys.path so chat module is always found
+# ---------------------------------------------------------------------------
+_backend_dir: Path = Path(__file__).resolve().parent
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
+
 # ---------------------------------------------------------------------------
 # Re-use all existing RAG logic from chat.py — zero duplication
 # ---------------------------------------------------------------------------
-from chat import (
-    DEFAULT_EMBEDDINGS_FILE_PATH,
-    DEFAULT_GENERATION_MODEL,
-    DEFAULT_OLLAMA_GENERATE_URL,
-    DEFAULT_OLLAMA_EMBEDDINGS_URL,
-    HTTP_STATUS_CODE_OK,
-    KEY_DONE,
-    KEY_MODEL,
-    KEY_PROMPT,
-    KEY_RESPONSE,
-    KEY_SECTION,
-    KEY_STREAM,
-    KEY_SYSTEM,
-    KEY_TEXT,
-    KEY_TITLE,
-    MESSAGE_NOT_AVAILABLE,
-    MINIMUM_SIMILARITY_THRESHOLD,
-    OUT_OF_SCOPE_SYSTEM_PROMPT,
-    SAFE_DEFLECTION_MESSAGE,
-    SYSTEM_PROMPT_TEMPLATE,
-    TOP_K_RELEVANT_CHUNKS,
-    UTF8_ENCODING,
-    StoredEmbeddingRecord,
-    ScoredChunkResult,
-    build_context_block,
-    build_out_of_scope_reply,
-    is_restricted_query,
-    load_embeddings_database,
-    retrieve_relevant_chunks,
-)
+try:
+    from chat import (
+        DEFAULT_EMBEDDINGS_FILE_PATH,
+        DEFAULT_GENERATION_MODEL,
+        DEFAULT_OLLAMA_GENERATE_URL,
+        DEFAULT_OLLAMA_EMBEDDINGS_URL,
+        HTTP_STATUS_CODE_OK,
+        KEY_DONE,
+        KEY_MODEL,
+        KEY_PROMPT,
+        KEY_RESPONSE,
+        KEY_SECTION,
+        KEY_STREAM,
+        KEY_SYSTEM,
+        KEY_TEXT,
+        KEY_TITLE,
+        MESSAGE_NOT_AVAILABLE,
+        MINIMUM_SIMILARITY_THRESHOLD,
+        OUT_OF_SCOPE_SYSTEM_PROMPT,
+        SAFE_DEFLECTION_MESSAGE,
+        SYSTEM_PROMPT_TEMPLATE,
+        TOP_K_RELEVANT_CHUNKS,
+        UTF8_ENCODING,
+        StoredEmbeddingRecord,
+        ScoredChunkResult,
+        build_context_block,
+        build_out_of_scope_reply,
+        is_restricted_query,
+        load_embeddings_database,
+        retrieve_relevant_chunks,
+    )
+except ImportError:
+    from backend.chat import (
+        DEFAULT_EMBEDDINGS_FILE_PATH,
+        DEFAULT_GENERATION_MODEL,
+        DEFAULT_OLLAMA_GENERATE_URL,
+        DEFAULT_OLLAMA_EMBEDDINGS_URL,
+        HTTP_STATUS_CODE_OK,
+        KEY_DONE,
+        KEY_MODEL,
+        KEY_PROMPT,
+        KEY_RESPONSE,
+        KEY_SECTION,
+        KEY_STREAM,
+        KEY_SYSTEM,
+        KEY_TEXT,
+        KEY_TITLE,
+        MESSAGE_NOT_AVAILABLE,
+        MINIMUM_SIMILARITY_THRESHOLD,
+        OUT_OF_SCOPE_SYSTEM_PROMPT,
+        SAFE_DEFLECTION_MESSAGE,
+        SYSTEM_PROMPT_TEMPLATE,
+        TOP_K_RELEVANT_CHUNKS,
+        UTF8_ENCODING,
+        StoredEmbeddingRecord,
+        ScoredChunkResult,
+        build_context_block,
+        build_out_of_scope_reply,
+        is_restricted_query,
+        load_embeddings_database,
+        retrieve_relevant_chunks,
+    )
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants & Environment Configuration
 # ---------------------------------------------------------------------------
 API_HOST: str = "0.0.0.0"
-API_PORT: int = 8000
+API_PORT: int = int(os.getenv("PORT", "8000"))
 API_TITLE: str = "Karthik's Portfolio RAG API"
 API_DESCRIPTION: str = (
-    "Local RAG chatbot API for Karthik S's portfolio. "
-    "Embeds queries with all-minilm, retrieves grounded context, "
-    "and generates answers via Qwen3."
+    "RAG chatbot API for Karthik S's portfolio. "
+    "Retrieves grounded context from embeddings and generates streaming answers."
 )
 API_VERSION: str = "1.0.0"
+
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+GROQ_CHAT_COMPLETIONS_URL: str = "https://api.groq.com/openai/v1/chat/completions"
 
 HEALTH_STATUS_OK: str = "ok"
 HEALTH_STATUS_ERROR: str = "error"
@@ -82,6 +129,13 @@ CORS_ALLOWED_ORIGINS: List[str] = [
     "http://127.0.0.1:3000",
     "http://localhost:4000",
 ]
+
+_custom_origins_raw: str = os.getenv("ALLOWED_ORIGINS", os.getenv("CORS_ORIGINS", ""))
+if _custom_origins_raw:
+    for _origin in _custom_origins_raw.split(","):
+        _cleaned = _origin.strip()
+        if _cleaned and _cleaned not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_cleaned)
 
 SSE_EVENT_TOKEN: str = "token"
 SSE_EVENT_DONE: str = "done"
@@ -107,6 +161,7 @@ application: FastAPI = FastAPI(
 application.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,7 +169,16 @@ application.add_middleware(
 
 # Load embeddings once at startup — shared across all requests
 _base_dir: Path = Path(__file__).resolve().parent
-_embeddings_path: Path = _base_dir / DEFAULT_EMBEDDINGS_FILE_PATH
+_candidates: List[Path] = [
+    _base_dir / DEFAULT_EMBEDDINGS_FILE_PATH,
+    _base_dir.parent / DEFAULT_EMBEDDINGS_FILE_PATH,
+    Path.cwd() / "backend" / DEFAULT_EMBEDDINGS_FILE_PATH,
+    Path.cwd() / DEFAULT_EMBEDDINGS_FILE_PATH,
+]
+_embeddings_path: Path = next(
+    (candidate for candidate in _candidates if candidate.is_file()),
+    _base_dir / DEFAULT_EMBEDDINGS_FILE_PATH,
+)
 stored_records: List[StoredEmbeddingRecord] = load_embeddings_database(
     file_path=_embeddings_path
 )
@@ -141,19 +205,20 @@ class ChatResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    ollama: str
+    backend_mode: str
+    llm_provider: str
     embeddings_loaded: int
 
 
 # ---------------------------------------------------------------------------
-# Helper: run Qwen3 generation (blocking, collects full response)
+# Helper: run generation (blocking, collects full response)
 # ---------------------------------------------------------------------------
 def generate_answer(
     question_text: str,
     context_text: str = EMPTY_STRING,
     custom_system_prompt: str = EMPTY_STRING,
 ) -> str:
-    """Call Ollama Qwen3 synchronously and return the complete answer."""
+    """Call Groq (cloud) or Ollama (local) synchronously and return the complete answer."""
     if custom_system_prompt:
         system_prompt: str = custom_system_prompt
     else:
@@ -161,6 +226,39 @@ def generate_answer(
             not_available=MESSAGE_NOT_AVAILABLE,
             context=context_text,
         )
+
+    # 1. Cloud Groq Generation if GROQ_API_KEY is configured
+    if GROQ_API_KEY:
+        groq_headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        groq_payload = {
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question_text},
+            ],
+            "stream": False,
+        }
+        response = sync_requests.post(
+            GROQ_CHAT_COMPLETIONS_URL,
+            json=groq_payload,
+            headers=groq_headers,
+            timeout=120,
+        )
+        if response.status_code != HTTP_STATUS_CODE_OK:
+            raise HTTPException(
+                status_code=502,
+                detail=ERROR_GENERATE_FAILED % response.text,
+            )
+        data = response.json()
+        choices = data.get("choices", [])
+        if choices:
+            return choices[0].get("message", {}).get("content", EMPTY_STRING)
+        return EMPTY_STRING
+
+    # 2. Local Ollama Generation fallback
     request_payload = {
         KEY_MODEL: DEFAULT_GENERATION_MODEL,
         KEY_PROMPT: question_text,
@@ -181,14 +279,14 @@ def generate_answer(
 
 
 # ---------------------------------------------------------------------------
-# Helper: stream Qwen3 generation as SSE tokens
+# Helper: stream generation as SSE tokens
 # ---------------------------------------------------------------------------
 async def stream_answer_sse(
     question_text: str,
     context_text: str = EMPTY_STRING,
     custom_system_prompt: str = EMPTY_STRING,
 ) -> AsyncIterator[str]:
-    """Yield Server-Sent Event chunks from Qwen3 for live UI streaming."""
+    """Yield Server-Sent Event chunks from Groq (cloud) or Qwen3 (local) for live UI streaming."""
     if custom_system_prompt:
         system_prompt: str = custom_system_prompt
     else:
@@ -196,14 +294,62 @@ async def stream_answer_sse(
             not_available=MESSAGE_NOT_AVAILABLE,
             context=context_text,
         )
-    request_payload = {
-        KEY_MODEL: DEFAULT_GENERATION_MODEL,
-        KEY_PROMPT: question_text,
-        KEY_SYSTEM: system_prompt,
-        KEY_STREAM: True,
-    }
 
     try:
+        # 1. Cloud Groq Streaming
+        if GROQ_API_KEY:
+            groq_headers = {
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            groq_payload = {
+                "model": GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": question_text},
+                ],
+                "stream": True,
+            }
+            response = sync_requests.post(
+                GROQ_CHAT_COMPLETIONS_URL,
+                json=groq_payload,
+                headers=groq_headers,
+                timeout=120,
+                stream=True,
+            )
+            for raw_line in response.iter_lines():
+                if not raw_line:
+                    continue
+                decoded_line = raw_line.decode(UTF8_ENCODING)
+                if decoded_line.startswith("data: "):
+                    content_body = decoded_line[6:].strip()
+                    if content_body == "[DONE]":
+                        break
+                    try:
+                        chunk_payload = json.loads(content_body)
+                        choices = chunk_payload.get("choices", [])
+                        if choices:
+                            delta_token = choices[0].get("delta", {}).get("content", EMPTY_STRING)
+                            if delta_token:
+                                yield SSE_DATA_TEMPLATE.format(
+                                    event=SSE_EVENT_TOKEN,
+                                    data=json.dumps({"token": delta_token}),
+                                )
+                    except json.JSONDecodeError:
+                        continue
+            yield SSE_DATA_TEMPLATE.format(
+                event=SSE_EVENT_DONE,
+                data=json.dumps({"done": True}),
+            )
+            return
+
+        # 2. Local Ollama Streaming fallback
+        request_payload = {
+            KEY_MODEL: DEFAULT_GENERATION_MODEL,
+            KEY_PROMPT: question_text,
+            KEY_SYSTEM: system_prompt,
+            KEY_STREAM: True,
+        }
         response = sync_requests.post(
             DEFAULT_OLLAMA_GENERATE_URL,
             json=request_payload,
@@ -238,20 +384,12 @@ async def stream_answer_sse(
 # ---------------------------------------------------------------------------
 @application.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
-    """Verify Ollama is reachable and embeddings are loaded."""
-    try:
-        ping = sync_requests.post(
-            DEFAULT_OLLAMA_EMBEDDINGS_URL,
-            json={KEY_MODEL: HEALTH_CHECK_MODEL, KEY_PROMPT: HEALTH_CHECK_PROMPT},
-            timeout=10,
-        )
-        ollama_status: str = HEALTH_STATUS_OK if ping.status_code == HTTP_STATUS_CODE_OK else HEALTH_STATUS_ERROR
-    except Exception:
-        ollama_status = HEALTH_STATUS_ERROR
-
+    """Verify backend health, active LLM provider, and loaded embeddings."""
+    provider_name: str = f"groq:{GROQ_MODEL}" if GROQ_API_KEY else f"ollama:{DEFAULT_GENERATION_MODEL}"
     return HealthResponse(
         status=HEALTH_STATUS_OK,
-        ollama=ollama_status,
+        backend_mode="cloud" if GROQ_API_KEY else "local",
+        llm_provider=provider_name,
         embeddings_loaded=len(stored_records),
     )
 
@@ -383,4 +521,4 @@ def chat_stream(request: ChatRequest) -> StreamingResponse:
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:application", host=API_HOST, port=API_PORT, reload=True)
+    uvicorn.run("api:application", host=API_HOST, port=API_PORT, reload=True, app_dir=str(_backend_dir))

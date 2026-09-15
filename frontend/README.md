@@ -82,7 +82,7 @@ The chat interface depends on the Python backend running in the project root:
 
 ```bash
 cd ..
-python api.py
+python backend/api.py
 ```
 
 The API exposes:

@@ -42,21 +42,24 @@ export const NAV_ITEMS: readonly NavItem[] = [
 /* ------------------------------------------------------------------ */
 /*  Chat Assistant Configuration                                       */
 /* ------------------------------------------------------------------ */
+const BACKEND_API_BASE_URL: string =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
 export const CHAT_CONFIG: ChatConfig = {
   title: "Ask Karthik's AI",
   badge: "Powered by Qwen 3 + RAG",
   placeholder: "type your question...",
   sendButtonAria: "Send question",
-  streamEndpoint: "http://localhost:8000/chat/stream",
+  streamEndpoint: `${BACKEND_API_BASE_URL}/chat/stream`,
   suggestions: [
     "What do you do in your current role?",
     "What's your experience with AI interfaces?",
     "Walk me through your career",
   ],
   statusThinking: "Thinking...",
-  statusError: "Unable to connect to local Qwen model. Please ensure the Python API is running on port 8000.",
-  offlineNotice: "RAG • Qwen 3:1.7b",
-} as const;
+  statusError: "Unable to connect to AI model. Please ensure the backend API is running.",
+  offlineNotice: "RAG • Qwen 3 / Cloud LLM",
+};
 
 /* ------------------------------------------------------------------ */
 /*  Hero                                                               */
