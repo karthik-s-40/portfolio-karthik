@@ -16,7 +16,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Iterator, List, Set, TypedDict
+from typing import Iterator, List, Optional, Set, TypedDict
 import requests
 import numpy as np
 from dotenv import load_dotenv
@@ -241,8 +241,8 @@ def fetch_question_embedding(
     question_text: str,
     model_name: str = DEFAULT_EMBEDDING_MODEL,
     api_url: str = DEFAULT_OLLAMA_EMBEDDINGS_URL,
-) -> List[float]:
-    """Fetch user question embedding vector via local Ollama or Hugging Face cloud API."""
+) -> Optional[List[float]]:
+    """Fetch user question embedding vector via local Ollama or Hugging Face cloud API, returning None if unavailable."""
     # 1. Attempt local Ollama embedding if accessible
     try:
         request_payload = {
@@ -252,36 +252,35 @@ def fetch_question_embedding(
         response = requests.post(
             api_url,
             json=request_payload,
-            timeout=5,
+            timeout=2,
         )
         if response.status_code == HTTP_STATUS_CODE_OK:
             response_payload = response.json()
             if KEY_EMBEDDING in response_payload:
                 return [float(val) for val in response_payload[KEY_EMBEDDING]]
-    except requests.exceptions.RequestException:
+    except Exception:
         pass
 
-    # 2. Cloud Fallback: Use Hugging Face Inference API for all-MiniLM-L6-v2
+    # 2. Cloud Fallback: Use Hugging Face Inference API for all-MiniLM-L6-v2 if configured
     hf_token: str = os.getenv("HF_TOKEN", EMPTY_STRING)
-    hf_headers = {"Authorization": f"Bearer {hf_token}"} if hf_token else {}
-    try:
-        hf_response = requests.post(
-            HF_EMBEDDING_API_URL,
-            headers=hf_headers,
-            json={"inputs": [question_text], "options": {"wait_for_model": True}},
-            timeout=15,
-        )
-        if hf_response.status_code == HTTP_STATUS_CODE_OK:
-            data = hf_response.json()
-            if isinstance(data, list) and len(data) > 0:
-                raw_vector = data[0] if isinstance(data[0], list) else data
-                return [float(val) for val in raw_vector]
-    except requests.exceptions.RequestException:
-        pass
+    if hf_token:
+        try:
+            hf_headers = {"Authorization": f"Bearer {hf_token}"}
+            hf_response = requests.post(
+                HF_EMBEDDING_API_URL,
+                headers=hf_headers,
+                json={"inputs": [question_text], "options": {"wait_for_model": True}},
+                timeout=5,
+            )
+            if hf_response.status_code == HTTP_STATUS_CODE_OK:
+                data = hf_response.json()
+                if isinstance(data, list) and len(data) > 0:
+                    raw_vector = data[0] if isinstance(data[0], list) else data
+                    return [float(val) for val in raw_vector]
+        except Exception:
+            pass
 
-    raise RuntimeError(
-        "Could not generate question embedding: neither local Ollama nor cloud embedding service responded."
-    )
+    return None
 
 
 def calculate_cosine_similarity(
@@ -334,36 +333,70 @@ def retrieve_relevant_chunks(
     model_name: str = DEFAULT_EMBEDDING_MODEL,
     api_url: str = DEFAULT_OLLAMA_EMBEDDINGS_URL,
 ) -> List[ScoredChunkResult]:
-    """Find top chunks and enforce threshold to reject out-of-scope queries."""
+    """Find top chunks using semantic vector cosine similarity or lexical fallback in cloud."""
     if is_personal_out_of_scope_query(question_text):
         return []
 
-    # Rewrite first-person pronouns to third-person so queries like
-    # "Where did you work?" match the third-person corpus correctly.
+    # Rewrite first-person pronouns to third-person
     retrieval_query: str = rewrite_query_for_retrieval(query_text=question_text)
-    question_vector: List[float] = fetch_question_embedding(
+    question_vector: Optional[List[float]] = fetch_question_embedding(
         question_text=retrieval_query,
         model_name=model_name,
         api_url=api_url,
     )
 
     scored_candidates: List[ScoredChunkResult] = []
-    for record in stored_records:
-        candidate_vector: List[float] = [
-            float(val) for val in record[KEY_EMBEDDING]
-        ]
-        similarity: float = calculate_cosine_similarity(
-            first_vector=question_vector,
-            second_vector=candidate_vector,
-        )
-        scored_candidates.append(
-            {
-                KEY_SECTION: record[KEY_SECTION],
-                KEY_TITLE: record[KEY_TITLE],
-                KEY_TEXT: record[KEY_TEXT],
-                "similarity_score": similarity,
-            }
-        )
+
+    if question_vector is not None:
+        # Semantic vector similarity (Ollama local or HF cloud)
+        for record in stored_records:
+            candidate_vector: List[float] = [
+                float(val) for val in record[KEY_EMBEDDING]
+            ]
+            similarity: float = calculate_cosine_similarity(
+                first_vector=question_vector,
+                second_vector=candidate_vector,
+            )
+            scored_candidates.append(
+                {
+                    KEY_SECTION: record[KEY_SECTION],
+                    KEY_TITLE: record[KEY_TITLE],
+                    KEY_TEXT: record[KEY_TEXT],
+                    "similarity_score": similarity,
+                }
+            )
+    else:
+        # Zero-dependency Lexical Keyword Matching (works in any cloud host without Ollama)
+        tokens: List[str] = extract_query_topics(query_text=question_text)
+        if not tokens:
+            tokens = [
+                t for t in re.findall(r"\b[a-zA-Z0-9]+\b", question_text.lower()) if len(t) > 2
+            ]
+
+        for record in stored_records:
+            title_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_TITLE].lower()))
+            section_words = set(re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_SECTION].lower()))
+            text_words = re.findall(r"\b[a-zA-Z0-9]+\b", record[KEY_TEXT].lower())
+
+            score: float = 0.0
+            for token in tokens:
+                if token in title_words:
+                    score += 0.45
+                if token in section_words:
+                    score += 0.25
+                match_count = text_words.count(token)
+                if match_count:
+                    score += min(0.35, 0.1 * match_count)
+
+            if score > 0:
+                scored_candidates.append(
+                    {
+                        KEY_SECTION: record[KEY_SECTION],
+                        KEY_TITLE: record[KEY_TITLE],
+                        KEY_TEXT: record[KEY_TEXT],
+                        "similarity_score": min(1.0, score),
+                    }
+                )
 
     scored_candidates.sort(
         key=lambda candidate: candidate["similarity_score"],

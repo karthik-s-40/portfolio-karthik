@@ -382,6 +382,21 @@ async def stream_answer_sse(
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+@application.get("/")
+def root_endpoint() -> dict:
+    """Root health and status endpoint."""
+    return {
+        "status": "online",
+        "service": "Karthik's Portfolio RAG API",
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "chat": "/chat",
+            "chat_stream": "/chat/stream",
+        },
+    }
+
+
 @application.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
     """Verify backend health, active LLM provider, and loaded embeddings."""
