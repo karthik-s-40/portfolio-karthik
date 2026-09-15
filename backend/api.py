@@ -115,8 +115,56 @@ API_DESCRIPTION: str = (
 API_VERSION: str = "1.0.0"
 
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 GROQ_CHAT_COMPLETIONS_URL: str = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODELS_URL: str = "https://api.groq.com/openai/v1/models"
+
+PREFERRED_GROQ_MODELS: List[str] = [
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.6-27b",
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "llama3-8b-8192",
+    "llama3-70b-8192",
+]
+
+_cached_groq_model: str = ""
+
+
+def resolve_groq_model(force_refresh: bool = False) -> str:
+    """Dynamically discover available Groq text generation model."""
+    global _cached_groq_model
+    if _cached_groq_model and not force_refresh:
+        return _cached_groq_model
+
+    env_model = os.getenv("GROQ_MODEL", "").strip()
+    if env_model and not force_refresh:
+        _cached_groq_model = env_model
+        return _cached_groq_model
+
+    if GROQ_API_KEY:
+        try:
+            resp = sync_requests.get(
+                GROQ_MODELS_URL,
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                timeout=5,
+            )
+            if resp.status_code == HTTP_STATUS_CODE_OK:
+                data = resp.json().get("data", [])
+                available_models = {m.get("id") for m in data if m.get("id")}
+                for pref in PREFERRED_GROQ_MODELS:
+                    if pref in available_models:
+                        _cached_groq_model = pref
+                        return pref
+                for m_id in available_models:
+                    if not any(skip in m_id.lower() for skip in ["whisper", "guard", "vision"]):
+                        _cached_groq_model = m_id
+                        return m_id
+        except Exception:
+            pass
+
+    _cached_groq_model = env_model or "openai/gpt-oss-20b"
+    return _cached_groq_model
 
 HEALTH_STATUS_OK: str = "ok"
 HEALTH_STATUS_ERROR: str = "error"
@@ -233,8 +281,9 @@ def generate_answer(
             "Authorization": f"Bearer {GROQ_API_KEY}",
             "Content-Type": "application/json",
         }
+        active_model = resolve_groq_model()
         groq_payload = {
-            "model": GROQ_MODEL,
+            "model": active_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": question_text},
@@ -247,6 +296,15 @@ def generate_answer(
             headers=groq_headers,
             timeout=120,
         )
+        if response.status_code == 404 or "model_not_found" in response.text:
+            active_model = resolve_groq_model(force_refresh=True)
+            groq_payload["model"] = active_model
+            response = sync_requests.post(
+                GROQ_CHAT_COMPLETIONS_URL,
+                json=groq_payload,
+                headers=groq_headers,
+                timeout=120,
+            )
         if response.status_code != HTTP_STATUS_CODE_OK:
             raise HTTPException(
                 status_code=502,
@@ -302,8 +360,9 @@ async def stream_answer_sse(
                 "Authorization": f"Bearer {GROQ_API_KEY}",
                 "Content-Type": "application/json",
             }
+            active_model = resolve_groq_model()
             groq_payload = {
-                "model": GROQ_MODEL,
+                "model": active_model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": question_text},
@@ -317,6 +376,16 @@ async def stream_answer_sse(
                 timeout=120,
                 stream=True,
             )
+            if response.status_code == 404:
+                active_model = resolve_groq_model(force_refresh=True)
+                groq_payload["model"] = active_model
+                response = sync_requests.post(
+                    GROQ_CHAT_COMPLETIONS_URL,
+                    json=groq_payload,
+                    headers=groq_headers,
+                    timeout=120,
+                    stream=True,
+                )
             for raw_line in response.iter_lines():
                 if not raw_line:
                     continue
@@ -400,7 +469,7 @@ def root_endpoint() -> dict:
 @application.get("/health", response_model=HealthResponse)
 def health_check() -> HealthResponse:
     """Verify backend health, active LLM provider, and loaded embeddings."""
-    provider_name: str = f"groq:{GROQ_MODEL}" if GROQ_API_KEY else f"ollama:{DEFAULT_GENERATION_MODEL}"
+    provider_name: str = f"groq:{resolve_groq_model()}" if GROQ_API_KEY else f"ollama:{DEFAULT_GENERATION_MODEL}"
     return HealthResponse(
         status=HEALTH_STATUS_OK,
         backend_mode="cloud" if GROQ_API_KEY else "local",
